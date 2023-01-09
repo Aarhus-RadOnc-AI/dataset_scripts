@@ -7,6 +7,8 @@ import dcmrtstruct2nii
 import pydicom
 from multiprocessing import Pool
 
+# This script converts dicom to nii with dcmrtstruct2nii with support for multiprocessing. It is compatible with the
+# output of the dicom sorting script
 
 def extract_to_nii(file_path, out_folder):
     if os.path.exists(out_folder):
