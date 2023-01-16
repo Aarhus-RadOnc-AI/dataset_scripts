@@ -57,8 +57,8 @@ def zip_in_and_out(rtstruct_path, out_path, xy_scaling_factor):
     ## Zip rtstructs with nifti_folder/pt_id
     with pydicom.filereader.dcmread(rtstruct_path, force=True) as ds:
         pid = ds.PatientID
-    
-        out = os.path.join(out_path, f"{pid}")
+        series = ds.SeriesInstanceUID
+        out = os.path.join(out_path, pid, series)
         return rtstruct_path, out, xy_scaling_factor
 
 def zip_wrapper(rtstruct_paths, out_path, xy_scaling_factor):
