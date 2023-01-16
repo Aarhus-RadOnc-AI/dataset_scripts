@@ -78,8 +78,9 @@ if __name__ == "__main__":
     xy_scaling_factor = int(sys.argv[3])
     print(f"Scaling factor {xy_scaling_factor}")
     threads = int(sys.argv[4])
+    print(f"Threads {threads}")
     approved_only = bool(int(sys.argv[5]))
-
+    print(f"Approved only: {approved_only}")
     try:
         with open(sys.argv[6], "r") as r:
             file_paths = json.loads(r.read())
