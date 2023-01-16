@@ -29,21 +29,25 @@ def extract_to_nii(file_path, out_folder, xy_scaling_factor):
         with open("conversion_errors.log", "a") as f:
             f.write(f"{file_path};{e}\n")
 
-def check_if_rtstruct(f):
+def check_if_rtstruct(f, approved_only):
     try:
         with pydicom.filereader.dcmread(f, force=True) as ds:
             if ds.Modality == "RTSTRUCT":
-                if ds.ApprovalStatus == "APPROVED":
+                if approved_only:
+                    if ds.ApprovalStatus == "APPROVED":
+                        print(f"Found RTSTRUCT: {f}")
+                        return f
+                else:
                     print(f"Found RTSTRUCT: {f}")
                     return f
     except Exception as e:
         print(e)
 
-def find_all_rtstructs(dcm):
+def find_all_rtstructs(dcm, approved_only):
     ## Get all subs with dicom files inside
     ## Find the shit of rtstructs
     p = Pool(threads)
-    rtstructs = p.map(check_if_rtstruct, [os.path.join(fol, f) for fol, subs, files in os.walk(dcm) for f in files])
+    rtstructs = p.starmap(check_if_rtstruct, [(os.path.join(fol, f), approved_only) for fol, subs, files in os.walk(dcm, followlinks=True) for f in files])
     p.close()
     p.join()
 
@@ -73,21 +77,17 @@ if __name__ == "__main__":
     print(f"Nifti folder: {nii_folder}")
     xy_scaling_factor = int(sys.argv[3])
     print(f"Scaling factor {xy_scaling_factor}")
-    try:
-        threads = int(sys.argv[4])
-        print(f"Threads: {threads}")
-    except Exception as e:
-        print("Falling back to single thread")
-        threads = 1
+    threads = int(sys.argv[4])
+    approved_only = bool(int(sys.argv[5]))
 
     try:
-        with open(sys.argv[5], "r") as r:
-            file_paths = json.loads(r.read())[:10]
+        with open(sys.argv[6], "r") as r:
+            file_paths = json.loads(r.read())
             print(f"RTSTRUCT file paths: {file_paths}")
     except Exception as e:
         print(e)
 
-        file_paths = find_all_rtstructs(dcm_folder)
+        file_paths = find_all_rtstructs(dcm_folder, approved_only)
         file_paths = set(file_paths)
 
         if None in file_paths:
