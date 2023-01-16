@@ -50,8 +50,10 @@ def sorter(dicom_loc):
     out_file = os.path.join(dst, patientID, studyDate, seriesDescription, fileName)
     if not os.path.exists(out_file):
         if use_link:
+            print(f"Linking {dicom_loc} -> {out_file}")
             os.link(dicom_loc, out_file)
         else:
+            print(f"Copying {dicom_loc} -> {out_file}")
             shutil.copy2(dicom_loc, out_file)
 
 
