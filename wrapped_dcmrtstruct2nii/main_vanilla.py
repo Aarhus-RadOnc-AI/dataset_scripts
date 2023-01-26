@@ -20,15 +20,10 @@ def find_dir_with_ct(folder):
                     return sub_path
 
 
-def extract_to_nii(file_path, out_folder, xy_scaling_factor, crop, convert_image):
+def extract_to_nii(file_path, out_folder):
     try:
         print(f"Converting {file_path}")
-        dcmrtstruct2nii.dcmrtstruct2nii(file_path,
-                                        find_dir_with_ct(file_path.rsplit("/", maxsplit=2)[0]),
-                                        out_folder,
-                                        xy_scaling_factor=xy_scaling_factor,
-                                        crop_masks=crop,
-                                        convert_original_dicom=convert_image)
+        dcmrtstruct2nii.dcmrtstruct2nii(file_path, find_dir_with_ct(file_path.rsplit("/", maxsplit=2)[0]), out_folder)
     except Exception as e:
         print(e)
         with open("conversion_errors.log", "a") as f:
@@ -58,19 +53,19 @@ def find_all_rtstructs(dcm, approved_only):
 
     return rtstructs
 
-def zip_in_and_out(rtstruct_path, out_path, xy_scaling_factor, crop, convert_image):
+def zip_in_and_out(rtstruct_path, out_path):
     ## Zip rtstructs with nifti_folder/pt_id
     with pydicom.filereader.dcmread(rtstruct_path, force=True) as ds:
         pid = ds.PatientID
         series = ds.SeriesInstanceUID
         out = os.path.join(out_path, pid, series)
-        return rtstruct_path, out, xy_scaling_factor, crop, convert_image
+        return rtstruct_path, out
 
-def zip_wrapper(rtstruct_paths, out_path, xy_scaling_factor, crop, convert_image):
+def zip_wrapper(rtstruct_paths, out_path, xy_scaling_factor):
     ## Zip rtstructs with nifti_folder/pt_id
     global threads
     t = Pool(threads)
-    results = t.starmap(zip_in_and_out, [(rt_path, out_path, xy_scaling_factor, crop, convert_image) for rt_path in rtstruct_paths])
+    results = t.starmap(zip_in_and_out, [(rt_path, out_path, xy_scaling_factor) for rt_path in rtstruct_paths])
     t.close()
     t.join()
     return results
@@ -80,12 +75,9 @@ if __name__ == "__main__":
         print("""
         1: dcm_folder
         2: nii_folder
-        3: xy_scale_factor
-        4: crop to roi
-        5: convert image
-        6: threads
-        7: Approval status
-        8: RTSTRUCT file paths
+        3: threads
+        4: Approval status
+        5: RTSTRUCT file paths
         """)
     dcm_folder = sys.argv[1]
     print(f"RTSTRUCT Dicom folder: {dcm_folder}")
@@ -93,22 +85,13 @@ if __name__ == "__main__":
     nii_folder = sys.argv[2]
     print(f"Nifti folder: {nii_folder}")
 
-    xy_scaling_factor = int(sys.argv[3])
-    print(f"Scaling factor {xy_scaling_factor}")
-
-    crop = bool(int(sys.argv[4]))
-    print(f"Crop: {str(crop)}")
-
-    convert_image = bool(int(sys.argv[5]))
-    print(f"Convert image: {str(convert_image)}")
-
-    threads = int(sys.argv[6])
+    threads = int(sys.argv[3])
     print(f"Threads {threads}")
 
-    approved_only = bool(int(sys.argv[7]))
+    approved_only = bool(int(sys.argv[4]))
     print(f"Approved only: {approved_only}")
     try:
-        with open(sys.argv[8], "r") as r:
+        with open(sys.argv[5], "r") as r:
             file_paths = json.loads(r.read())
             print(f"RTSTRUCT file paths: {file_paths}")
     except Exception as e:
@@ -128,7 +111,7 @@ if __name__ == "__main__":
 
     ## Convert the shit out of rtstructs
     p = Pool(threads)
-    zyps = zip_wrapper(file_paths, nii_folder, xy_scaling_factor, crop=crop, convert_image=convert_image)
+    zyps = zip_wrapper(file_paths, nii_folder)
     conversion = p.starmap(extract_to_nii, zyps)
     p.close()
     p.join()
