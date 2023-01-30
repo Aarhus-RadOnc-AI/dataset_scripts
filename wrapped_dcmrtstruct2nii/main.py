@@ -18,8 +18,12 @@ def find_dir_with_ct(folder, uid):
             f = os.path.join(fol, file)
             try:
                 with pydicom.dcmread(f, force=True, stop_before_pixels=True) as ds:
-                    if ds.Modality == "CT" and ds.FrameOfReferenceUID == uid:
+                    if check_cts_explicitly:
+                        if ds.FrameOfReferenceUID == uid:
+                            return os.path.dirname(f)
+                    elif ds.Modality == "CT":
                         return os.path.dirname(f)
+
             except AttributeError:
                 pass
 
@@ -29,7 +33,7 @@ def extract_to_nii(file_path, out_folder):
     ct_path = find_dir_with_ct(os.path.join(os.path.dirname(file_path), rel_ct_path), uid)
     try:
         if not ct_path:
-            raise Exception("CT not found")
+            raise Exception(f"{file_path}, CT not found")
         print(f"Converting {file_path}")
         dcmrtstruct2nii.dcmrtstruct2nii(file_path,
                                         ct_path,
@@ -70,14 +74,11 @@ def find_all_rtstructs(dcm):
 
 def zip_in_and_out(rtstruct_path, out_path):
     ## Zip rtstructs with nifti_folder/pt_id
-    if not sort_by_series_instance_uid:
+
+    with pydicom.filereader.dcmread(rtstruct_path, force=True) as ds:
+        series = ds.SeriesInstanceUID
         fol = os.path.dirname(rtstruct_path)
-        out = os.path.join(out_path, fol)
-    else:
-        with pydicom.filereader.dcmread(rtstruct_path, force=True) as ds:
-            pid = ds.PatientID
-            series = ds.SeriesInstanceUID
-            out = os.path.join(out_path, pid, series)
+        out = os.path.join(out_path, fol, series)
 
     os.makedirs(out, exist_ok=True)
 
@@ -103,7 +104,7 @@ if __name__ == "__main__":
     parser.add_argument('-s', nargs='+', help='Structures to convert. Comma seperated with mo spaces. You can use "~" to exclude', default=None)
     parser.add_argument('-j', type=str, help='Path an existing json of all RTSTRUCTS to convert', default=None)
     parser.add_argument('-k', type=str, help='Relative path to where to look for CT', default="..")
-    parser.add_argument('-b', type=int, help='Sort by RTSTRUCT UID. If false, sorts by input folder', default=0)
+    parser.add_argument('-m', type=int, help='Check CTs explicitely for match', default=1)
 
 
     args = parser.parse_args()
@@ -130,11 +131,11 @@ if __name__ == "__main__":
     approved_only = bool(args.p)
     print(f"Approved only: {approved_only}")
 
-    sort_by_series_instance_uid = bool(args.b)
-    print(f"Sort by series instance uid: {sort_by_series_instance_uid}")
-
     inclusion_structures = args.s
     print(f"inclusion_structures: {inclusion_structures}")
+
+    check_cts_explicitly = bool(args.m)
+    print(f"Check CT eplicitly: {check_cts_explicitly}")
 
     rt_files = args.j
     if rt_files:
@@ -145,11 +146,12 @@ if __name__ == "__main__":
         except Exception as e:
             print(e)
 
+    else:
+        file_paths = find_all_rtstructs(dcm_folder)
+        file_paths = set(file_paths)
+
     rel_ct_path = args.k
     print(f"Relative path to cts: {rel_ct_path}")
-
-    file_paths = find_all_rtstructs(dcm_folder)
-    file_paths = set(file_paths)
 
     if None in file_paths:
         file_paths.remove(None)
