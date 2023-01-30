@@ -34,7 +34,7 @@ def extract_to_nii(file_path, out_folder):
                                         ct_path,
                                         out_folder,
                                         xy_scaling_factor=xy_scaling_factor,
-                                        crop_masks=crop,
+                                        crop_mask=crop,
                                         convert_original_dicom=convert_image,
                                         structures=inclusion_structures)
     except Exception as e:
@@ -84,7 +84,8 @@ def zip_wrapper(rtstruct_paths, out_path):
     return results
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Process some integers.Wrapper of dcmrtstruct2nii')
+    parser = argparse.ArgumentParser(description='Wrapper of dcmrtstruct2nii')
+    parser.add_argument('-d', type=str, help='Path dicoms')
     parser.add_argument('-n', type=str, help='Path to where nifti is output')
     parser.add_argument('-a', type=int, help='XY scaling factor', default=1)
     parser.add_argument('-x', type=int, help='Bool whether to crop mask to ROI', default=False)
@@ -102,12 +103,12 @@ if __name__ == "__main__":
 
     nii_folder = args.n
     print(f"Nifti folder: {nii_folder}")
-
+    os.makedirs(nii_folder, exist_ok=True)
 
     xy_scaling_factor = args.a
     print(f"Scaling factor {xy_scaling_factor}")
 
-    crop = bool(args.z)
+    crop = bool(args.x)
     print(f"Crop: {str(crop)}")
 
     convert_image = bool(args.c)
