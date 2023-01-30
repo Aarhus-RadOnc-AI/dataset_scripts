@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 # coding: utf-8
+import argparse
 import json
-import sys
 import os
+from multiprocessing import Pool
+
 import dcmrtstruct2nii
 import pydicom
-from multiprocessing import Pool
-import argparse
+
 
 # This script converts dicom to nii with dcmrtstruct2nii with support for multiprocessing. It is compatible with the
 # output of the dicom sorting script
