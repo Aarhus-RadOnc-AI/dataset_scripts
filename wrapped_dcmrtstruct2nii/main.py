@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import traceback
 from multiprocessing import Pool
 
 import dcmrtstruct2nii
@@ -18,18 +19,32 @@ def find_dir_with_ct(folder, uid):
             f = os.path.join(fol, file)
             try:
                 with pydicom.dcmread(f, force=True, stop_before_pixels=True) as ds:
-                    if ds.Modality == "CT" and ds.FrameOfReferenceUID == uid:
+                    if check_cts_explicitly:
+                        if ds.FrameOfReferenceUID == uid:
+                            return os.path.dirname(f)
+                    elif ds.Modality == "CT":
                         return os.path.dirname(f)
+
             except AttributeError:
                 pass
 
+
 def extract_to_nii(file_path, out_folder):
     ds = pydicom.dcmread(file_path, force=True, stop_before_pixels=True)
-    uid = ds.StructureSetROISequence[0][0x30060024].value
-    ct_path = find_dir_with_ct(os.path.join(os.path.dirname(file_path), rel_ct_path), uid)
+    for i, structure in enumerate(ds.StructureSetROISequence):
+        uid = structure[0x30060024].value
+        if ct_path.startswith("."):
+            p = os.path.join(os.path.dirname(file_path), ct_path)
+        else:
+            p = ct_path
+
+        ct_path = find_dir_with_ct(p, uid)
+        if ct_path:
+            break
+    else:
+        raise Exception(f"{file_path}, CT not found")
+
     try:
-        if not ct_path:
-            raise Exception("CT not found")
         print(f"Converting {file_path}")
         dcmrtstruct2nii.dcmrtstruct2nii(file_path,
                                         ct_path,
@@ -39,9 +54,11 @@ def extract_to_nii(file_path, out_folder):
                                         convert_original_dicom=convert_image,
                                         structures=inclusion_structures)
     except Exception as e:
-        print(e)
+        error = f"{e};{traceback.format_exc()}"
+        print(error)
         with open("conversion_errors.log", "a") as f:
-            f.write(f"{file_path};{e}\n")
+            f.write(f"{file_path};{error}\n")
+
 
 def check_if_rtstruct(f, approved_only):
     try:
@@ -58,30 +75,31 @@ def check_if_rtstruct(f, approved_only):
     except Exception as e:
         pass
 
+
 def find_all_rtstructs(dcm):
     ## Get all subs with dicom files inside
     ## Find the shit of rtstructs
     p = Pool(threads)
-    rtstructs = p.starmap(check_if_rtstruct, [(os.path.join(fol, f), approved_only) for fol, subs, files in os.walk(dcm, followlinks=True) for f in files])
+    rtstructs = p.starmap(check_if_rtstruct,
+                          [(os.path.join(fol, f), approved_only) for fol, subs, files in os.walk(dcm, followlinks=True)
+                           for f in files])
     p.close()
     p.join()
 
     return rtstructs
 
+
 def zip_in_and_out(rtstruct_path, out_path):
     ## Zip rtstructs with nifti_folder/pt_id
-    if not sort_by_series_instance_uid:
+    with pydicom.filereader.dcmread(rtstruct_path, force=True) as ds:
+        series = ds.SeriesInstanceUID
         fol = os.path.dirname(rtstruct_path)
-        out = os.path.join(out_path, fol)
-    else:
-        with pydicom.filereader.dcmread(rtstruct_path, force=True) as ds:
-            pid = ds.PatientID
-            series = ds.SeriesInstanceUID
-            out = os.path.join(out_path, pid, series)
+        out = os.path.join(out_path, fol, series)
 
     os.makedirs(out, exist_ok=True)
 
     return rtstruct_path, out
+
 
 def zip_wrapper(rtstruct_paths, out_path):
     ## Zip rtstructs with nifti_folder/pt_id
@@ -90,6 +108,7 @@ def zip_wrapper(rtstruct_paths, out_path):
     t.close()
     t.join()
     return results
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Wrapper of dcmrtstruct2nii')
@@ -100,11 +119,12 @@ if __name__ == "__main__":
     parser.add_argument('-c', type=int, help='Whether to convert dicom image', default=True)
     parser.add_argument('-t', type=int, help='Threads - use with care with high xy scaling factors', default=1)
     parser.add_argument('-p', type=int, help='Convert only RTSTRUCTs with ApprovalStatus=Approved', default=False)
-    parser.add_argument('-s', nargs='+', help='Structures to convert. Comma seperated with mo spaces. You can use "~" to exclude', default=None)
+    parser.add_argument('-s', nargs='+',
+                        help='Structures to convert. Comma seperated with mo spaces. You can use "~" to exclude',
+                        default=None)
     parser.add_argument('-j', type=str, help='Path an existing json of all RTSTRUCTS to convert', default=None)
-    parser.add_argument('-k', type=str, help='Relative path to where to look for CT', default="..")
-    parser.add_argument('-b', type=int, help='Sort by RTSTRUCT UID. If false, sorts by input folder', default=0)
-
+    parser.add_argument('-k', type=str, help='Path to where to look for CT - relative path starts with "./" it will be relative to RTSTRUCT-file', default="..")
+    parser.add_argument('-m', type=int, help='Check CTs explicitely for match', default=1)
 
     args = parser.parse_args()
 
@@ -130,11 +150,11 @@ if __name__ == "__main__":
     approved_only = bool(args.p)
     print(f"Approved only: {approved_only}")
 
-    sort_by_series_instance_uid = bool(args.b)
-    print(f"Sort by series instance uid: {sort_by_series_instance_uid}")
-
     inclusion_structures = args.s
     print(f"inclusion_structures: {inclusion_structures}")
+
+    check_cts_explicitly = bool(args.m)
+    print(f"Check CT eplicitly: {check_cts_explicitly}")
 
     rt_files = args.j
     if rt_files:
@@ -145,11 +165,12 @@ if __name__ == "__main__":
         except Exception as e:
             print(e)
 
-    rel_ct_path = args.k
-    print(f"Relative path to cts: {rel_ct_path}")
+    else:
+        file_paths = find_all_rtstructs(dcm_folder)
+        file_paths = set(file_paths)
 
-    file_paths = find_all_rtstructs(dcm_folder)
-    file_paths = set(file_paths)
+    ct_path = args.k
+    print(f"Relative path to cts: {ct_path}")
 
     if None in file_paths:
         file_paths.remove(None)
@@ -166,5 +187,3 @@ if __name__ == "__main__":
     conversion = p.starmap(extract_to_nii, zyps)
     p.close()
     p.join()
-
-
