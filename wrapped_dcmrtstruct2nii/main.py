@@ -70,11 +70,18 @@ def find_all_rtstructs(dcm):
 
 def zip_in_and_out(rtstruct_path, out_path):
     ## Zip rtstructs with nifti_folder/pt_id
-    with pydicom.filereader.dcmread(rtstruct_path, force=True) as ds:
-        pid = ds.PatientID
-        series = ds.SeriesInstanceUID
-        out = os.path.join(out_path, pid, series)
-        return rtstruct_path, out
+    if not sort_by_series_instance_uid:
+        fol = os.path.dirname(rtstruct_path)
+        out = os.path.join(out_path, fol)
+    else:
+        with pydicom.filereader.dcmread(rtstruct_path, force=True) as ds:
+            pid = ds.PatientID
+            series = ds.SeriesInstanceUID
+            out = os.path.join(out_path, pid, series)
+
+    os.makedirs(out, exist_ok=True)
+
+    return rtstruct_path, out
 
 def zip_wrapper(rtstruct_paths, out_path):
     ## Zip rtstructs with nifti_folder/pt_id
@@ -96,6 +103,8 @@ if __name__ == "__main__":
     parser.add_argument('-s', nargs='+', help='Structures to convert. Comma seperated with mo spaces. You can use "~" to exclude', default=None)
     parser.add_argument('-j', type=str, help='Path an existing json of all RTSTRUCTS to convert', default=None)
     parser.add_argument('-k', type=str, help='Relative path to where to look for CT', default="..")
+    parser.add_argument('-b', type=int, help='Sort by RTSTRUCT UID. If false, sorts by input folder', default=0)
+
 
     args = parser.parse_args()
 
@@ -120,6 +129,9 @@ if __name__ == "__main__":
 
     approved_only = bool(args.p)
     print(f"Approved only: {approved_only}")
+
+    sort_by_series_instance_uid = bool(args.b)
+    print(f"Sort by series instance uid: {sort_by_series_instance_uid}")
 
     inclusion_structures = args.s
     print(f"inclusion_structures: {inclusion_structures}")
