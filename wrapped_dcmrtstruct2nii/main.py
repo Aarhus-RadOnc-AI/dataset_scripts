@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 # coding: utf-8
-import argparse
-import json
 import os
 import traceback
 from multiprocessing import Pool
 
 import dcmrtstruct2nii
 import pydicom
+
+import json
+import argparse
 
 
 # This script converts dicom to nii with dcmrtstruct2nii with support for multiprocessing. It is compatible with the
@@ -33,10 +34,10 @@ def extract_to_nii(file_path, out_folder):
     ds = pydicom.dcmread(file_path, force=True, stop_before_pixels=True)
     for i, structure in enumerate(ds.StructureSetROISequence):
         uid = structure[0x30060024].value
-        if ct_path.startswith("."):
-            p = os.path.join(os.path.dirname(file_path), ct_path)
+        if look_ct_path.startswith("."):
+            p = os.path.join(os.path.dirname(file_path), look_ct_path)
         else:
-            p = ct_path
+            p = look_ct_path
 
         ct_path = find_dir_with_ct(p, uid)
         if ct_path:
@@ -156,6 +157,9 @@ if __name__ == "__main__":
     check_cts_explicitly = bool(args.m)
     print(f"Check CT eplicitly: {check_cts_explicitly}")
 
+    look_ct_path = args.k
+    print(f"Relative path to cts: {look_ct_path}")
+
     rt_files = args.j
     if rt_files:
         try:
@@ -169,8 +173,6 @@ if __name__ == "__main__":
         file_paths = find_all_rtstructs(dcm_folder)
         file_paths = set(file_paths)
 
-    ct_path = args.k
-    print(f"Relative path to cts: {ct_path}")
 
     if None in file_paths:
         file_paths.remove(None)
