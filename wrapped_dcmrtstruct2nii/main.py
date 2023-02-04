@@ -21,7 +21,7 @@ def find_dir_with_ct(folder, uid):
             try:
                 with pydicom.dcmread(f, force=True, stop_before_pixels=True) as ds:
                     if check_cts_explicitly:
-                        if ds.FrameOfReferenceUID == uid:
+                        if ds.FrameOfReferenceUID == uid and ds.Modality == "CT":
                             return os.path.dirname(f)
                     elif ds.Modality == "CT":
                         return os.path.dirname(f)
@@ -57,7 +57,7 @@ def extract_to_nii(file_path, out_folder):
     except Exception as e:
         error = f"{e};{traceback.format_exc()}"
         print(error)
-        with open("conversion_errors.log", "a") as f:
+        with open(os.path.join(nii_folder, "conversion_errors.log"), "a") as f:
             f.write(f"{file_path};{error}\n")
 
 
