@@ -31,21 +31,21 @@ def find_dir_with_ct(folder, uid):
 
 
 def extract_to_nii(file_path, out_folder):
-    ds = pydicom.dcmread(file_path, force=True, stop_before_pixels=True)
-    for i, structure in enumerate(ds.StructureSetROISequence):
-        uid = structure[0x30060024].value
-        if look_ct_path.startswith("."):
-            p = os.path.join(os.path.dirname(file_path), look_ct_path)
-        else:
-            p = look_ct_path
-
-        ct_path = find_dir_with_ct(p, uid)
-        if ct_path:
-            break
-    else:
-        raise Exception(f"{file_path}, CT not found")
-
     try:
+        ds = pydicom.dcmread(file_path, force=True, stop_before_pixels=True)
+        for i, structure in enumerate(ds.StructureSetROISequence):
+            uid = structure[0x30060024].value
+            if look_ct_path.startswith("."):
+                p = os.path.join(os.path.dirname(file_path), look_ct_path)
+            else:
+                p = look_ct_path
+            ct_path = find_dir_with_ct(p, uid)
+            if ct_path:
+                break
+
+        else:
+            raise Exception(f"{file_path}, CT not found")
+
         print(f"Converting {file_path}")
         dcmrtstruct2nii.dcmrtstruct2nii(file_path,
                                         ct_path,
