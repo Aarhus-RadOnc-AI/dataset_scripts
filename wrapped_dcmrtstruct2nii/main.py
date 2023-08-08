@@ -35,9 +35,13 @@ def extract_to_nii(file_path, out_folder):
         ds = pydicom.dcmread(file_path, force=True, stop_before_pixels=True)
         for i, structure in enumerate(ds.StructureSetROISequence):
             uid = structure[0x30060024].value
+            if look_ct_path.startswith("./"):
+                p = os.path.abspath(os.path.join(os.path.dirname(file_path), look_ct_path))
+            elif look_ct_path.startswith("/"):
+                p = look_ct_path
+            else:
+                raise Exception("Wrong path. Must start with either ./ or /")
             
-            p = os.path.abspath(os.path.join(os.path.dirname(file_path), look_ct_path))
-
             ct_path = find_dir_with_ct(p, uid)
             if ct_path:
                 break
@@ -123,7 +127,7 @@ if __name__ == "__main__":
                         help='Structures to convert. Comma seperated with mo spaces. You can use "~" to exclude',
                         default=None)
     parser.add_argument('-j', type=str, help='Path an existing json of all RTSTRUCTS to convert', default=None)
-    parser.add_argument('-k', type=str, help='Relative path to where to look for CT from rtstruct. Default is ".."', default="..")
+    parser.add_argument('-k', type=str, help='Relative path to where to look for CT from rtstruct. Default is "./.."', default="./..")
     parser.add_argument('-m', type=int, help='Check CTs explicitely for match', default=1)
 
     args = parser.parse_args()
