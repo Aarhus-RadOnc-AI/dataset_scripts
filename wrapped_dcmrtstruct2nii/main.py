@@ -14,21 +14,6 @@ import argparse
 # This script converts dicom to nii with dcmrtstruct2nii with support for multiprocessing. It is compatible with the
 # output of the dicom sorting script
 
-def find_dir_with_ct(folder, uid):
-    for fol, subs, files in os.walk(folder, followlinks=True):
-        for file in files:
-            f = os.path.join(fol, file)
-            try:
-                with pydicom.dcmread(f, force=True, stop_before_pixels=True) as ds:
-                    if check_cts_explicitly:
-                        if ds.FrameOfReferenceUID == uid and ds.Modality == "CT":
-                            return os.path.dirname(f)
-                    elif ds.Modality == "CT":
-                        return os.path.dirname(f)
-
-            except AttributeError:
-                pass
-
 
 def extract_to_nii(row, df, approval_status, nifti_folder):
     if approval_status and row["ApprovalStatus"] != "APPROVED":
@@ -37,7 +22,7 @@ def extract_to_nii(row, df, approval_status, nifti_folder):
     try:
         file_path = row["path"]    
         ct_path = os.path.dirname(df[df["FrameOfReferenceUID"] == row["ReferencedFrameOfReferenceUID"]].iloc[0]["path"])
-        out_folder = os.path.join(row["PatientID"], row["SeriesInstanceUID"])
+        out_folder = os.path.join(nifti_folder, row["PatientID"], row["SeriesInstanceUID"])
         os.makedirs(os.path.dirname(out_folder), exist_ok=True)
         print(f"Converting {file_path}")
         dcmrtstruct2nii.dcmrtstruct2nii(file_path,
